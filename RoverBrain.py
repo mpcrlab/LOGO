@@ -18,7 +18,7 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 3 #5 FRAMES PER SECOND
+        self.FPS = 8 #5 FRAMES PER SECOND
         self.image = None
         self.quit = False
         self.paused = True
@@ -28,8 +28,9 @@ class RoverBrain(Rover):
         self.timeStart = time.time()
         self.lr = 0.5
         self.imsz = [240//3, 320//3]
-        self.ps = 21
-        self.D = torch.randn(3*self.ps**2, 100).float().cuda(0)
+        self.ps = 15
+        self.k = 144
+        self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.run()
 
 
