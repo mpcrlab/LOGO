@@ -18,7 +18,7 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 4 #4 FRAMES PER SECOND
+        self.FPS = 4 #3 FRAMES PER SECOND
         self.image = None
         self.quit = False
         self.paused = True
@@ -41,7 +41,7 @@ class RoverBrain(Rover):
     def process_video_from_rover(self, jpegbytes, timestamp_10msec):
         array_of_bytes = np.fromstring(jpegbytes, np.uint8)
         self.image = cv2.imdecode(array_of_bytes, flags=3)
-        k = cv2.waitKey(5) & 0xFF
+        k = cv2.waitKey(1) & 0xFF
         return self.image
 
 
@@ -51,7 +51,6 @@ class RoverBrain(Rover):
         while type(self.image) == type(None): 
             pass
 
-
         while not self.quit:
             #self.displayDashboard()
 
@@ -60,7 +59,7 @@ class RoverBrain(Rover):
             if key:
                 key = chr(key)
 
-                if key in ['w','a','d','s','q', 'z']:
+                if key in ['w','a','d','s','q', 'z', 'i', 'm']:
 		    if key == 'w':
 		        self.action = 0
                         self.set_wheel_treads(self.speed,self.speed)
@@ -85,9 +84,18 @@ class RoverBrain(Rover):
                         self.set_wheel_treads(0,0)
                         self.quit = True
 
+                    elif key == 'i':
+                        self.move_camera_in_vertical_direction(1)
 
+                    elif key == 'm':
+                        self.move_camera_in_vertical_direction(-1)
+
+
+            #cv2.imshow('rovercam', self.image)
+            #cv2.waitKey(1)
             self.clock.tick(self.FPS)
             pygame.display.flip()
+            self.move_camera_in_vertical_direction(0)
 
 
         pygame.quit()
