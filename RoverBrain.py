@@ -18,13 +18,13 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 3 #3 FRAMES PER SECOND
+        self.FPS = 4 #4 FRAMES PER SECOND
         self.image = None
         self.quit = False
         self.paused = True
         self.action = 0
         self.treads = [0,0]
-        self.speed=.65
+        self.speed=.5
         self.timeStart = time.time()
         self.run()
 
