@@ -157,7 +157,7 @@ class RoverBrain(Rover):
             self.image = imresize(self.image, self.imsz)
             self.D, self.a = self.X3(self.image, self.D)
 		
-	    if self.count % (self.FPS / 2) == 0:
+	    if self.count % (self.FPS / 2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', self.montage(self.mat2ten(self.D.cpu().numpy())))
             	cv2.waitKey(1)
