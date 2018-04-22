@@ -107,14 +107,6 @@ class RoverBrain(Rover):
         return D, a
 
 
-
-    def process_video_from_rover(self, jpegbytes, timestamp_10msec):
-        array_of_bytes = np.fromstring(jpegbytes, np.uint8)
-        self.image = cv2.imdecode(array_of_bytes, flags=3)
-        k = cv2.waitKey(1) & 0xFF
-        return self.image
-
-
 #############################################################################
     def run(self):
 
