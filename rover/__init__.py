@@ -200,11 +200,10 @@ class Rover:
         self._send_control_request_to_rover(on_or_off, 0)
 
     def process_video_from_rover(self, jpegbytes, timestamp_10msec):
-        """ Processes bytes from a JPEG image streamed from Rover.
-            Default method is a no-op; subclass and override to do something
-            interesting.
-        """
-        pass
+        array_of_bytes = np.fromstring(jpegbytes, np.uint8)
+        self.image = cv2.imdecode(array_of_bytes, flags=3)
+        k = cv2.waitKey(1) & 0xFF
+        return self.image
 
     def process_audio_from_rover(self, pcmsamples, timestamp_10msec):
         """ Processes a block of 320 PCM audio samples streamed from Rover.
