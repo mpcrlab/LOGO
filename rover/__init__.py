@@ -2,6 +2,7 @@ import threading
 import socket
 import time
 import numpy as np
+import cv2
 
 from rover.blowfish import Blowfish
 from rover.adpcm import decodeADPCMToPCM
