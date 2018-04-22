@@ -37,6 +37,7 @@ class RoverBrain(Rover):
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
         #self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
+        self.err = torch.zeros(3*self.ps**2, self.num_rows*self.num_cols).cuda(0)
         self.run()
 
 
@@ -89,30 +90,33 @@ class RoverBrain(Rover):
         return np.uint8(M)
 
 
-    def salience(self):
-        horiz = self.num_rows // 2
-        vert = self.num_cols // 2
-        self.a = torch.abs(self.a)
+    def salience(self, x):
+        horiz = self.num_rows // 3
+        vert = self.num_cols // 3
        
-        a_p = self.a.unfold(0, self.a.size(0), 1)[0, ...]
-        u_l = a_p.unfold(0, vert, vert*2)[:horiz, ...]
-        l_l = a_p.unfold(0, vert, vert*2)[horiz:, ...]
-        u_r = a_p[vert:, :].unfold(0, vert, vert*2)[:horiz, ...]
-        l_r = a_p[vert:, :].unfold(0, vert, vert*2)[horiz:, ...]
+        a_p = x.unfold(0, self.a.size(0), 1)[0, ...]
+        u_l = a_p.unfold(0, vert, vert*3)[:horiz, ...]
+        l_l = a_p.unfold(0, vert, vert*3)[horiz*2:, ...]
+        u_c = a_p[vert:, :].unfold(0, vert, vert*3)[horiz:horiz*2, ...]
+        l_c = a_p[vert:, :].unfold(0, vert, vert*3)[horiz:horiz*2, ...]
+        u_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[:horiz, ...]
+        l_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[horiz*2:, ...]
 
         u_l = torch.max(torch.sum(torch.sum(u_l, 0), 0))
         l_l = torch.max(torch.sum(torch.sum(l_l, 0), 0))
         u_r = torch.max(torch.sum(torch.sum(u_r, 0), 0))
-        l_r = torch.max(torch.sum(torch.sum(l_r, 0), 0))         
-        
+        l_r = torch.max(torch.sum(torch.sum(l_r, 0), 0))
+        u_c = torch.max(torch.sum(torch.sum(u_c, 0), 0))
+        l_c = torch.max(torch.sum(torch.sum(l_c, 0), 0))
+      
 
 
     def X3(self, x, D):
         e = 1e-8  # constant to avoid div. by 0.
         
         # prepare x, normalize, whiten, etc.
-        x = torch.from_numpy(x).float().cuda(0)
-        x = x.unfold(0, self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
+        x = (torch.from_numpy(x).float().cuda(0)).unfold(0, 
+             self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
                                 x.size(3)*x.size(4), x.size(-1))
         x = x - torch.mean(x, 0)
@@ -131,8 +135,10 @@ class RoverBrain(Rover):
         # cubic activation function
         a = (self.lr - self.count/1000) * a ** 3
 
+        x = x - torch.mm(D, a)
+
         # update dictionary based on Hebbian learning rule
-        D = D + torch.mm(x - torch.mm(D, a), torch.t(a))
+        D = D + torch.mm(x, torch.t(a))
 
         ############ second round --- hierarchical features #################
 
@@ -145,7 +151,7 @@ class RoverBrain(Rover):
         #a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
         #D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, a
+        return D, a, torch.sqrt(x**2)
 
 
 #############################################################################
@@ -195,15 +201,15 @@ class RoverBrain(Rover):
 
 
             self.image = imresize(self.image, self.imsz)
-            self.D, self.a = self.X3(self.image, self.D)
+            self.D, _, self.err = self.X3(self.image, self.D)
 		
 	    if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary', self.image) 
-                           #self.montage(self.mat2ten(self.D.cpu().numpy())))
+            	cv2.imshow('dictionary', 
+                           self.montage(self.mat2ten(self.D.cpu().numpy())))
             	cv2.waitKey(1)  
        
-            self.salience()
+            self.salience(self.err)
            
             if self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]  
