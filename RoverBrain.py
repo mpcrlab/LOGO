@@ -18,7 +18,7 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 12  # FRAMES PER SECOND
+        self.FPS = 20  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False  
         self.paused = True
@@ -27,12 +27,14 @@ class RoverBrain(Rover):
 	self.count = 0  
         self.speed=.5  # change the vehicle's speed here
         self.ts = time.time()
-        self.lr = 0.5 # learning rate --- need to incorporate decay
+        self.lr = 0.2 # learning rate
         self.imsz = [240//3, 320//3] # size to reshape self.image to
         self.prune = 1
         self.ps = 15
-        self.k = 144
+        self.k = 81
+        self.k2 = 81
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
+        self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
         self.run()
 
 
@@ -87,9 +89,10 @@ class RoverBrain(Rover):
 
 
 
-    def X3(self, x, D):
-        e = 1e-8
+    def X3(self, x, D, D_2):
+        e = 1e-8  # constant to avoid div. by 0.
         
+        # prepare x, normalize, whiten, etc.
         x = torch.from_numpy(x).float().cuda(0)
         x = x.unfold(0, self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
@@ -98,14 +101,33 @@ class RoverBrain(Rover):
         x = torch.t(x.view(-1, x.size(1)*3))
         x = self.whiten(x)
         
+        # scale each patch between 0 and 1
         D = torch.mm(D, torch.diag(1./(torch.sqrt(torch.sum(D**2, 0))+e)))
+        
+        # see how much each neuron fires for each patch
         a = torch.mm(torch.t(D), x).cuda(0)
+
+        # lateral inhibition...scaling coefficients to between 0 and 1
         a = torch.mm(a, torch.diag(1./(torch.sqrt(torch.sum(a**2, 0))+e)))
-        a = .3 * a ** 3
-        #x = x - torch.mm(D, a)
+
+        # cubic activation function
+        a = (self.lr - self.count/1000) * a ** 3
+
+        # update dictionary based on Hebbian learning rule
         D = D + torch.mm(x - torch.mm(D, a), torch.t(a))
 
-        return D, a
+        ############ second round --- hierarchical features #################
+
+        D_2 = torch.mm(D_2, 
+                       torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
+        a_2 = torch.mm(torch.t(D_2), 
+                       self.whiten(D - torch.mean(D, 1)[:, None]))
+        a_2 = torch.mm(a_2, 
+                       torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
+        a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
+        D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
+
+        return D, D_2
 
 
 #############################################################################
@@ -155,16 +177,19 @@ class RoverBrain(Rover):
 
 
             self.image = imresize(self.image, self.imsz)
-            self.D, self.a = self.X3(self.image, self.D)
+            self.D, self.D_2 = self.X3(self.image, self.D, self.D_2)
 		
-	    if self.count % self.FPS == 0 or self.count == 0:
+	    if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary', self.montage(self.mat2ten(self.D.cpu().numpy())))
+            	cv2.imshow('dictionary', 
+                           self.montage(self.mat2ten(self.D_2.cpu().numpy())))
             	cv2.waitKey(1)  
            
-            if self.count % (self.FPS * 10) == 0:
+            if self.count % (self.FPS * 20) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]  
-                self.D[:, rk] = torch.randn(self.D.size(0),)     
+                rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
+                self.D[:, rk] = torch.randn(self.D.size(0),)  
+                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
 
             self.clock.tick(self.FPS)
             pygame.display.flip()
