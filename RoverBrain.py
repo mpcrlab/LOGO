@@ -18,23 +18,25 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 5  # FRAMES PER SECOND
+        self.FPS = 6  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False  
         self.paused = True
         self.action = 0  # what action to do
         self.treads = [0,0]  # steering/throttle action
 	self.count = 0  
-        self.speed=.5  # change the vehicle's speed here
+        self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
-        self.lr = 0.2 # learning rate
-        self.imsz = [240//3, 320//3] # size to reshape self.image to
+        self.lr = 0.5 # learning rate
+        self.imsz = np.asarray([240//3, 320//3])
         self.prune = 1
         self.ps = 15
-        self.k = 81
-        self.k2 = 81
+        self.k = 196
+        #self.k2 = 81
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
-        self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
+        self.num_rows, self.num_cols = self.imsz - self.ps // 2
+        self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
+        #self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
         self.run()
 
 
@@ -89,7 +91,7 @@ class RoverBrain(Rover):
 
 
 
-    def X3(self, x, D, D_2):
+    def X3(self, x, D):
         e = 1e-8  # constant to avoid div. by 0.
         
         # prepare x, normalize, whiten, etc.
@@ -118,16 +120,16 @@ class RoverBrain(Rover):
 
         ############ second round --- hierarchical features #################
 
-        D_2 = torch.mm(D_2, 
-                       torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        a_2 = torch.mm(torch.t(D_2), 
-                       self.whiten(D - torch.mean(D, 1)[:, None]))
-        a_2 = torch.mm(a_2, 
-                       torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
-        a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
-        D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
+        #D_2 = torch.mm(D_2, 
+        #               torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
+        #a_2 = torch.mm(torch.t(D_2), 
+        #               self.whiten(D - torch.mean(D, 1)[:, None]))
+        #a_2 = torch.mm(a_2, 
+        #               torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
+        #a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
+        #D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2
+        return D, a
 
 
 #############################################################################
@@ -177,19 +179,19 @@ class RoverBrain(Rover):
 
 
             self.image = imresize(self.image, self.imsz)
-            self.D, self.D_2 = self.X3(self.image, self.D, self.D_2)
+            self.D, self.a = self.X3(self.image, self.D)
 		
 	    if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', 
-                           self.montage(self.mat2ten(self.D_2.cpu().numpy())))
+                           self.montage(self.mat2ten(self.D.cpu().numpy())))
             	cv2.waitKey(1)  
            
-            if self.count % (self.FPS * 20) == 0:
+            if self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]  
-                rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
+                #rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
                 self.D[:, rk] = torch.randn(self.D.size(0),)  
-                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
+                #self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
 
             self.clock.tick(self.FPS)
             pygame.display.flip()
