@@ -18,12 +18,13 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 8 #5 FRAMES PER SECOND
-        self.image = None
-        self.quit = False
+        self.FPS = 8  # FRAMES PER SECOND
+        self.image = None  # incoming image
+        self.quit = False  
         self.paused = True
-        self.action = 0
-        self.treads = [0,0]
+        self.action = 0  # what action to do
+        self.treads = [0,0]  # steering/throttle action
+	self.count = 0  
         self.speed=.5
         self.timeStart = time.time()
         self.lr = 0.5
@@ -155,13 +156,17 @@ class RoverBrain(Rover):
 
             self.image = imresize(self.image, self.imsz)
             self.D, self.a = self.X3(self.image, self.D)
-            cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            cv2.imshow('dictionary', self.montage(self.mat2ten(self.D.cpu().numpy())))
-            cv2.waitKey(1)
+		
+	    if self.count / self.FPS == 0.5:
+            	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
+            	cv2.imshow('dictionary', self.montage(self.mat2ten(self.D.cpu().numpy())))
+            	cv2.waitKey(1)
+		self.count = 0
             
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.move_camera_in_vertical_direction(0)
+	    self.count += 1
 
 
         pygame.quit()
