@@ -1,6 +1,7 @@
 import threading
 import socket
 import time
+import numpy as np
 
 from rover.blowfish import Blowfish
 from rover.adpcm import decodeADPCMToPCM
