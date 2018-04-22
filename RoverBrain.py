@@ -18,17 +18,18 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 8  # FRAMES PER SECOND
+        self.FPS = 12  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False  
         self.paused = True
         self.action = 0  # what action to do
         self.treads = [0,0]  # steering/throttle action
 	self.count = 0  
-        self.speed=.5
-        self.timeStart = time.time()
-        self.lr = 0.5
-        self.imsz = [240//3, 320//3]
+        self.speed=.5  # change the vehicle's speed here
+        self.ts = time.time()
+        self.lr = 0.5 # learning rate --- need to incorporate decay
+        self.imsz = [240//3, 320//3] # size to reshape self.image to
+        self.prune = 1
         self.ps = 15
         self.k = 144
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
@@ -50,7 +51,6 @@ class RoverBrain(Rover):
         epsilon = 1e-5
         ZCAMatrix = torch.diag(1.0/torch.sqrt(S + epsilon))
         ZCAMatrix = torch.mm(U, torch.mm(ZCAMatrix, torch.t(U)))
-        #ZCAMatrix = torch.mm(U, torch.mm(torch.diag(1.0/torch.sqrt(S + epsilon)), torch.t(U)))
 
         return torch.mm(ZCAMatrix, X)
 
@@ -102,8 +102,8 @@ class RoverBrain(Rover):
         a = torch.mm(torch.t(D), x).cuda(0)
         a = torch.mm(a, torch.diag(1./(torch.sqrt(torch.sum(a**2, 0))+e)))
         a = .3 * a ** 3
-        x = x - torch.mm(D, a)
-        D = D + torch.mm(x, torch.t(a))
+        #x = x - torch.mm(D, a)
+        D = D + torch.mm(x - torch.mm(D, a), torch.t(a))
 
         return D, a
 
@@ -160,16 +160,19 @@ class RoverBrain(Rover):
 	    if self.count % self.FPS == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', self.montage(self.mat2ten(self.D.cpu().numpy())))
-            	cv2.waitKey(1)
-		self.count = 0
-            
+            	cv2.waitKey(1)  
+           
+            if self.count % (self.FPS * 10) == 0:
+                rk = np.random.randint(0, self.D.size(1), 1)[0]  
+                self.D[:, rk] = torch.randn(self.D.size(0),)     
+
             self.clock.tick(self.FPS)
             pygame.display.flip()
-            self.move_camera_in_vertical_direction(0)
-	    self.count += 1
+            self.count += 1
 
+            if key in ['i', 'm']:
+                self.move_camera_in_vertical_direction(0)
 
         pygame.quit()
         cv2.destroyAllWindows()
         self.close()
-
