@@ -34,7 +34,7 @@ class RoverBrain(Rover):
         self.k = 196
         #self.k2 = 81
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
-        self.num_rows, self.num_cols = self.imsz - self.ps // 2
+        self.num_rows, self.num_cols = self.imsz - self.ps
         self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
         #self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
         self.run()
@@ -89,6 +89,22 @@ class RoverBrain(Rover):
         return np.uint8(M)
 
 
+    def salience(self):
+        horiz = self.num_rows // 2
+        vert = self.num_cols // 2
+        self.a = torch.abs(self.a)
+       
+        a_p = self.a.unfold(0, self.a.size(0), 1)[0, ...]
+        u_l = a_p.unfold(0, vert, vert*2)[:horiz, ...]
+        l_l = a_p.unfold(0, vert, vert*2)[horiz:, ...]
+        u_r = a_p[vert:, :].unfold(0, vert, vert*2)[:horiz, ...]
+        l_r = a_p[vert:, :].unfold(0, vert, vert*2)[horiz:, ...]
+
+        u_l = torch.max(torch.sum(torch.sum(u_l, 0), 0))
+        l_l = torch.max(torch.sum(torch.sum(l_l, 0), 0))
+        u_r = torch.max(torch.sum(torch.sum(u_r, 0), 0))
+        l_r = torch.max(torch.sum(torch.sum(l_r, 0), 0))         
+        
 
 
     def X3(self, x, D):
@@ -183,9 +199,11 @@ class RoverBrain(Rover):
 		
 	    if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary', 
-                           self.montage(self.mat2ten(self.D.cpu().numpy())))
+            	cv2.imshow('dictionary', self.image) 
+                           #self.montage(self.mat2ten(self.D.cpu().numpy())))
             	cv2.waitKey(1)  
+       
+            self.salience()
            
             if self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]  
