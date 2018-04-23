@@ -218,18 +218,17 @@ class RoverBrain(Rover):
 
             if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary', self.image)
-                           #self.montage(self.mat2ten(
-                           #self.D.cpu().numpy())))
+            	cv2.imshow('dictionary',
+                           self.montage(self.mat2ten(
+                           self.D.cpu().numpy())))
             	cv2.waitKey(1)
-
-            self.salience(self.a_2, loud=True)
-
-            if self.count % (self.FPS * 15) == 0:
+            elif self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]
                 rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
                 self.D[:, rk] = torch.randn(self.D.size(0),)
                 self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
+
+            self.salience(self.a_2)
 
             self.clock.tick(self.FPS)
             pygame.display.flip()
