@@ -18,25 +18,34 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 6  # FRAMES PER SECOND
+        self.FPS = 8  # FRAMES PER SECOND
         self.image = None  # incoming image
-        self.quit = False  
+        self.quit = False
         self.paused = True
         self.action = 0  # what action to do
         self.treads = [0,0]  # steering/throttle action
-	self.count = 0  
+        self.count = 0
         self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
         self.lr = 0.2 # learning rate
         self.imsz = np.asarray([240//3, 320//3])
+        self.action_dict = {}
+        self.cam_dict = {}
+        self.action_dict['w'] = [self.speed, self.speed]
+        self.action_dict['a'] = [-self.speed, self.speed]
+        self.action_dict['s'] = [-self.speed, -self.speed]
+        self.action_dict['d'] = [self.speed, -self.speed]
+        self.cam_dict['i'] = 1
+        self.cam_dict['m'] = -1
+        self.action_dict['q'] = [0, 0]
         self.ps = 15
         self.prune = 1.25e-6
         self.k = 196
-        self.k2 = 81
+        self.k2 = 256
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.num_rows, self.num_cols = self.imsz - self.ps
-        self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
-        self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
+        self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
+        self.D_2 = torch.randn(self.k, self.k2).float().cuda(0)
         self.run()
 
 
@@ -45,7 +54,7 @@ class RoverBrain(Rover):
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 key = event.key
-        return key       
+        return key
 
 
 
@@ -89,42 +98,62 @@ class RoverBrain(Rover):
         return np.uint8(M)
 
 
-    def salience(self, x):
+    def salience(self, x, loud=False):
         horiz = self.num_rows // 3
         vert = self.num_cols // 3
-       
-        a_p = x.unfold(0, x.size(0), 1)[0, ...]
-        u_l = a_p.unfold(0, vert, vert*3)[:horiz, ...]
-        l_l = a_p.unfold(0, vert, vert*3)[horiz*2:, ...]
-        u_c = a_p[vert:, :].unfold(0, vert, vert*3)[horiz:horiz*2, ...]
-        l_c = a_p[vert:, :].unfold(0, vert, vert*3)[horiz:horiz*2, ...]
-        u_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[:horiz, ...]
-        l_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[horiz*2:, ...]
 
-        u_l = torch.max(torch.sum(torch.sum(u_l, 0), 0))
-        l_l = torch.max(torch.sum(torch.sum(l_l, 0), 0))
-        u_r = torch.max(torch.sum(torch.sum(u_r, 0), 0))
-        l_r = torch.max(torch.sum(torch.sum(l_r, 0), 0))
-        u_c = torch.max(torch.sum(torch.sum(u_c, 0), 0))
-        l_c = torch.max(torch.sum(torch.sum(l_c, 0), 0))
-      
+        s = np.zeros([9,])
+        s_name = ['upper left',
+                  'upper center',
+                  'upper right',
+                  'center left',
+                  'center center',
+                  'center right',
+                  'lower left',
+                  'lower center',
+                  'lower right']
+
+        a_p = torch.abs(x).unfold(0, x.size(0), 1)[0, ...]
+        u_l = a_p.unfold(0, vert, vert*3)[0, :horiz, ...]
+        u_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, :horiz, ...]
+        u_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, :horiz, ...]
+        c_l = a_p.unfold(0, vert, vert*3)[0, horiz:horiz*2, ...]
+        c_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, horiz:horiz*2, ...]
+        c_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, horiz:horiz*2]
+        l_l = a_p.unfold(0, vert, vert*3)[0, horiz*2:, ...]
+        l_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, horiz*2:, ...]
+        l_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, horiz*2:, ...]
+
+        s[0] = torch.max(torch.sum(torch.sum(u_l, 0), 0))
+        s[1] = torch.max(torch.sum(torch.sum(u_c, 0), 0))
+        s[2] = torch.max(torch.sum(torch.sum(u_r, 0), 0))
+        s[3] = torch.max(torch.sum(torch.sum(c_l, 0), 0))
+        s[4] = torch.max(torch.sum(torch.sum(c_c, 0), 0))
+        s[5] = torch.max(torch.sum(torch.sum(c_r, 0), 0))
+        s[6] = torch.max(torch.sum(torch.sum(l_l, 0), 0))
+        s[7] = torch.max(torch.sum(torch.sum(l_c, 0), 0))
+        s[8] = torch.max(torch.sum(torch.sum(l_r, 0), 0))
+
+        if loud:
+            s = print(s_name[np.argmax(s)])
+
 
 
     def X3(self, x, D, D_2):
         e = 1e-8  # constant to avoid div. by 0.
-        
+
         # prepare x, normalize, whiten, etc.
-        x = (torch.from_numpy(x).float().cuda(0)).unfold(0, 
+        x = (torch.from_numpy(x).float().cuda(0)).unfold(0,
              self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
                                 x.size(3)*x.size(4), x.size(-1))
         x = x - torch.mean(x, 0)
         x = torch.t(x.view(-1, x.size(1)*3))
         x = self.whiten(x)
-        
+
         # scale each patch between 0 and 1
         D = torch.mm(D, torch.diag(1./(torch.sqrt(torch.sum(D**2, 0))+e)))
-        
+
         # see how much each neuron fires for each patch
         a = torch.mm(torch.t(D), x).cuda(0)
 
@@ -141,15 +170,16 @@ class RoverBrain(Rover):
 
         ############ second round --- abstract features #################
 
-        D_2 = torch.mm(D_2, 
+        D_2 = torch.mm(D_2,
                        torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        d = torch.t(D).contiguous().view(-1, 15*15, 3)
-        d = torch.t((d - torch.mean(d, 0)).view(-1, 15*15*3))
-        a_2 = torch.mm(torch.t(D_2), self.whiten(d))
-        a_2 = torch.mm(a_2, 
+        #a = self.whiten(a - torch.mean(a, 1)[:, None])
+        a_2 = torch.mm(torch.t(D_2),
+                       self.whiten(a - torch.mean(a, 1)[:, None]))
+        a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
         a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
-        D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
+        a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
+        D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
         return D, D_2, a
 
@@ -157,70 +187,49 @@ class RoverBrain(Rover):
 #############################################################################
     def run(self):
 
-        while type(self.image) == type(None): 
+        while type(self.image) == type(None):
             pass
 
         while not self.quit:
-            #self.displayDashboard()
-
        	    key = self.getActiveKey()
 
             if key:
                 key = chr(key)
 
-                if key in ['w','a','d','s','q', 'z', 'i', 'm']:
-		    if key == 'w':
-		        self.action = 0
-                        self.set_wheel_treads(self.speed,self.speed)
+                if key in self.action_dict:
+                    act = self.action_dict[key]
+                    self.set_wheel_treads(act[0], act[1])
 
-		    elif key == 'a':
-		        self.action = -1
-                        self.set_wheel_treads(-self.speed,self.speed)
+                elif key in self.cam_dict:
+                    act = self.cam_dict[key]
+                    self.move_camera_in_vertical_direction(act)
 
-		    elif key == 'd':
-		        self.action = 1
-                        self.set_wheel_treads(self.speed,-self.speed)
-
-		    elif key == 's':
-		        self.action = 2
-                        self.set_wheel_treads(-self.speed,-self.speed)
-
-		    elif key == 'q':
-		        self.action = 9
-		        self.set_wheel_treads(0,0)
-
-                    elif key == 'z':
-                        self.set_wheel_treads(0,0)
-                        self.quit = True
-
-                    elif key == 'i':
-                        self.move_camera_in_vertical_direction(1)
-
-                    elif key == 'm':
-                        self.move_camera_in_vertical_direction(-1)
+                elif key == 'z':
+                    self.set_wheel_treads(0,0)
+                    self.quit = True
 
 
 
             self.image = imresize(self.image, self.imsz)
 
-            self.D, self.D_2, self.a = self.X3(self.image,
-                                               self.D, 
-                                               self.D_2)
-		
-	    if self.count % (self.FPS*2) == 0 or self.count == 0:
+            self.D, self.D_2, self.a_2 = self.X3(self.image,
+                                                 self.D,
+                                                 self.D_2)
+
+            if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary', 
-                           self.montage(self.mat2ten(
-                           self.D_2.cpu().numpy())))
-            	cv2.waitKey(1)  
-       
-            self.salience(self.a)
-           
+            	cv2.imshow('dictionary', self.image)
+                           #self.montage(self.mat2ten(
+                           #self.D.cpu().numpy())))
+            	cv2.waitKey(1)
+
+            self.salience(self.a_2, loud=True)
+
             if self.count % (self.FPS * 15) == 0:
-                rk = np.random.randint(0, self.D.size(1), 1)[0]  
+                rk = np.random.randint(0, self.D.size(1), 1)[0]
                 rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
-                self.D[:, rk] = torch.randn(self.D.size(0),)  
-                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
+                self.D[:, rk] = torch.randn(self.D.size(0),)
+                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
 
             self.clock.tick(self.FPS)
             pygame.display.flip()
