@@ -27,7 +27,7 @@ class RoverBrain(Rover):
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
-        self.lr = 0.2 # learning rate
+        self.lr = 0.5 # learning rate
         self.imsz = np.asarray([240//3, 320//3])
         self.action_dict = {}
         self.cam_dict = {}
@@ -118,7 +118,7 @@ class RoverBrain(Rover):
         c_l = x.unfold(1, vert, vert*3)[:, horiz:horiz*2, ...]
         c_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, horiz:horiz*2, ...]
         c_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, horiz:horiz*2]
-        l_l = x.unfold(1 vert, vert*3)[:, horiz*2:, ...]
+        l_l = x.unfold(1, vert, vert*3)[:, horiz*2:, ...]
         l_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
         l_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
 
@@ -220,7 +220,7 @@ class RoverBrain(Rover):
                            self.montage(self.mat2ten(
                            self.D.cpu().numpy())))
             	cv2.waitKey(1)
-                
+
             elif self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]
                 rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
