@@ -39,7 +39,6 @@ class RoverBrain(Rover):
         self.cam_dict['m'] = -1
         self.action_dict['q'] = [0, 0]
         self.ps = 15
-        self.prune = 1.25e-6
         self.k = 196
         self.k2 = 256
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
