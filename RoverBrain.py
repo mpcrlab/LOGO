@@ -112,26 +112,26 @@ class RoverBrain(Rover):
                   'lower center',
                   'lower right']
 
-        a_p = torch.abs(x).unfold(0, x.size(0), 1)[0, ...]
-        u_l = a_p.unfold(0, vert, vert*3)[0, :horiz, ...]
-        u_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, :horiz, ...]
-        u_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, :horiz, ...]
-        c_l = a_p.unfold(0, vert, vert*3)[0, horiz:horiz*2, ...]
-        c_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, horiz:horiz*2, ...]
-        c_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, horiz:horiz*2]
-        l_l = a_p.unfold(0, vert, vert*3)[0, horiz*2:, ...]
-        l_c = a_p[vert:vert*2, :].unfold(0, vert, vert*3)[0, horiz*2:, ...]
-        l_r = a_p[vert*2:, :].unfold(0, vert, vert*3)[0, horiz*2:, ...]
+        #a_p = torch.abs(x).unfold(0, x.size(0), 1)[0, ...]
+        u_l = x.unfold(1, vert, vert*3)[0, :horiz, ...]
+        u_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, :horiz, ...]
+        u_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, :horiz, ...]
+        c_l = x.unfold(0, vert, vert*3)[1, horiz:horiz*2, ...]
+        c_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, horiz:horiz*2, ...]
+        c_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, horiz:horiz*2]
+        l_l = x.unfold(0, vert, vert*3)[1, horiz*2:, ...]
+        l_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, horiz*2:, ...]
+        l_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, horiz*2:, ...]
 
-        s[0] = torch.max(torch.sum(torch.sum(u_l, 0), 0))
-        s[1] = torch.max(torch.sum(torch.sum(u_c, 0), 0))
-        s[2] = torch.max(torch.sum(torch.sum(u_r, 0), 0))
-        s[3] = torch.max(torch.sum(torch.sum(c_l, 0), 0))
-        s[4] = torch.max(torch.sum(torch.sum(c_c, 0), 0))
-        s[5] = torch.max(torch.sum(torch.sum(c_r, 0), 0))
-        s[6] = torch.max(torch.sum(torch.sum(l_l, 0), 0))
-        s[7] = torch.max(torch.sum(torch.sum(l_c, 0), 0))
-        s[8] = torch.max(torch.sum(torch.sum(l_r, 0), 0))
+        s[0] = torch.sum(u_l)
+        s[1] = torch.sum(u_c)
+        s[2] = torch.sum(u_r)
+        s[3] = torch.sum(c_l)
+        s[4] = torch.sum(c_c)
+        s[5] = torch.sum(c_r)
+        s[6] = torch.sum(l_l)
+        s[7] = torch.sum(l_c)
+        s[8] = torch.sum(l_r)
 
         if loud:
             s = print(s_name[np.argmax(s)])
