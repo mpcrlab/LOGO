@@ -27,17 +27,16 @@ class RoverBrain(Rover):
 	self.count = 0  
         self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
-        self.lr = 0.5 # learning rate
+        self.lr = 0.2 # learning rate
         self.imsz = np.asarray([240//3, 320//3])
-        self.prune = 1
         self.ps = 15
+        self.prune = 1.25e-6
         self.k = 196
-        #self.k2 = 81
+        self.k2 = 81
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
-        #self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
-        self.err = torch.zeros(3*self.ps**2, self.num_rows*self.num_cols).cuda(0)
+        self.D_2 = torch.randn(3*self.ps**2, self.k2).float().cuda(0)
         self.run()
 
 
@@ -94,7 +93,7 @@ class RoverBrain(Rover):
         horiz = self.num_rows // 3
         vert = self.num_cols // 3
        
-        a_p = x.unfold(0, self.a.size(0), 1)[0, ...]
+        a_p = x.unfold(0, x.size(0), 1)[0, ...]
         u_l = a_p.unfold(0, vert, vert*3)[:horiz, ...]
         l_l = a_p.unfold(0, vert, vert*3)[horiz*2:, ...]
         u_c = a_p[vert:, :].unfold(0, vert, vert*3)[horiz:horiz*2, ...]
@@ -111,7 +110,7 @@ class RoverBrain(Rover):
       
 
 
-    def X3(self, x, D):
+    def X3(self, x, D, D_2):
         e = 1e-8  # constant to avoid div. by 0.
         
         # prepare x, normalize, whiten, etc.
@@ -140,18 +139,19 @@ class RoverBrain(Rover):
         # update dictionary based on Hebbian learning rule
         D = D + torch.mm(x, torch.t(a))
 
-        ############ second round --- hierarchical features #################
+        ############ second round --- abstract features #################
 
-        #D_2 = torch.mm(D_2, 
-        #               torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        #a_2 = torch.mm(torch.t(D_2), 
-        #               self.whiten(D - torch.mean(D, 1)[:, None]))
-        #a_2 = torch.mm(a_2, 
-        #               torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
-        #a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
-        #D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
+        D_2 = torch.mm(D_2, 
+                       torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
+        d = torch.t(D).contiguous().view(-1, 15*15, 3)
+        d = torch.t((d - torch.mean(d, 0)).view(-1, 15*15*3))
+        a_2 = torch.mm(torch.t(D_2), self.whiten(d))
+        a_2 = torch.mm(a_2, 
+                       torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
+        a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
+        D_2 = D_2 + torch.mm(D - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, a, torch.sqrt(x**2)
+        return D, D_2, a
 
 
 #############################################################################
@@ -200,22 +200,27 @@ class RoverBrain(Rover):
                         self.move_camera_in_vertical_direction(-1)
 
 
+
             self.image = imresize(self.image, self.imsz)
-            self.D, _, self.err = self.X3(self.image, self.D)
+
+            self.D, self.D_2, self.a = self.X3(self.image,
+                                               self.D, 
+                                               self.D_2)
 		
 	    if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', 
-                           self.montage(self.mat2ten(self.D.cpu().numpy())))
+                           self.montage(self.mat2ten(
+                           self.D_2.cpu().numpy())))
             	cv2.waitKey(1)  
        
-            self.salience(self.err)
+            self.salience(self.a)
            
             if self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]  
-                #rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
+                rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
                 self.D[:, rk] = torch.randn(self.D.size(0),)  
-                #self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
+                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)    
 
             self.clock.tick(self.FPS)
             pygame.display.flip()
