@@ -112,16 +112,15 @@ class RoverBrain(Rover):
                   'lower center',
                   'lower right']
 
-        #a_p = torch.abs(x).unfold(0, x.size(0), 1)[0, ...]
-        u_l = x.unfold(1, vert, vert*3)[0, :horiz, ...]
-        u_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, :horiz, ...]
-        u_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, :horiz, ...]
-        c_l = x.unfold(0, vert, vert*3)[1, horiz:horiz*2, ...]
-        c_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, horiz:horiz*2, ...]
-        c_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, horiz:horiz*2]
-        l_l = x.unfold(0, vert, vert*3)[1, horiz*2:, ...]
-        l_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[0, horiz*2:, ...]
-        l_r = x[vert*2:, :].unfold(1, vert, vert*3)[0, horiz*2:, ...]
+        u_l = x.unfold(1, vert, vert*3)[:, :horiz, ...]
+        u_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, :horiz, ...]
+        u_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, :horiz, ...]
+        c_l = x.unfold(1, vert, vert*3)[:, horiz:horiz*2, ...]
+        c_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, horiz:horiz*2, ...]
+        c_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, horiz:horiz*2]
+        l_l = x.unfold(1 vert, vert*3)[:, horiz*2:, ...]
+        l_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
+        l_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
 
         s[0] = torch.sum(u_l)
         s[1] = torch.sum(u_c)
@@ -221,6 +220,7 @@ class RoverBrain(Rover):
                            self.montage(self.mat2ten(
                            self.D.cpu().numpy())))
             	cv2.waitKey(1)
+                
             elif self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]
                 rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
