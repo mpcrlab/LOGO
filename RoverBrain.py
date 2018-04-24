@@ -29,7 +29,7 @@ class RoverBrain(Rover):
         self.ts = time.time()
         self.lr = 0.5 # learning rate
         self.downsample = 2
-        self.imsz = np.asarray([240//3, 320//3])
+        self.imsz = np.asarray([240//2, 320//2])
         self.action_dict = {}
         self.cam_dict = {}
         self.action_dict['w'] = [self.speed, self.speed]
