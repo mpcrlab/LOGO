@@ -40,8 +40,8 @@ class RoverBrain(Rover):
         self.cam_dict['m'] = -1
         self.action_dict['q'] = [0, 0]
         self.ps = 11
-        self.k = 196
-        self.k2 = 256
+        self.k = 400
+        self.k2 = 500
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
@@ -161,7 +161,7 @@ class RoverBrain(Rover):
         a = torch.mm(a, torch.diag(1./(torch.sqrt(torch.sum(a**2, 0))+e)))
 
         # cubic activation function
-        a = (self.lr - self.count/1000) * a ** 3
+        a = self.lr * a ** 3
 
         #x = x - torch.mm(D, a)
 
@@ -172,12 +172,12 @@ class RoverBrain(Rover):
 
         D_2 = torch.mm(D_2,
                        torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        #a = self.whiten(a - torch.mean(a, 1)[:, None])
+        a = self.whiten(a - torch.mean(a, 1)[:, None])
         a_2 = torch.mm(torch.t(D_2),
                        self.whiten(a - torch.mean(a, 1)[:, None]))
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
-        a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
+        a_2 = self.lr * a_2 ** 3
         #a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
         D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
@@ -219,7 +219,7 @@ class RoverBrain(Rover):
             if self.count % (self.FPS*2) == 0 or self.count == 0:
                 self.salience(self.a_2, loud=True)
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
-            	cv2.imshow('dictionary',
+            	cv2.imshow('dictionary', #self.image)
                            self.montage(self.mat2ten(
                            self.D.cpu().numpy())))
             	cv2.waitKey(1)
