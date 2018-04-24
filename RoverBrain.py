@@ -217,6 +217,7 @@ class RoverBrain(Rover):
                                                  self.D_2)
 
             if self.count % (self.FPS*2) == 0 or self.count == 0:
+                self.salience(self.a_2, loud=True)
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary',
                            self.montage(self.mat2ten(
@@ -229,7 +230,6 @@ class RoverBrain(Rover):
                 self.D[:, rk] = torch.randn(self.D.size(0),)
                 self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
 
-            self.salience(self.a_2)
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
