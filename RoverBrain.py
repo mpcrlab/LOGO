@@ -14,21 +14,24 @@ from skimage.util import view_as_windows as vaw
 from torchvision.transforms import Pad
 
 class RoverBrain(Rover):
-    def __init__(self, driver=True):
+    def __init__(self, driver):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
         self.FPS = 8  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
-        self.driver = driver
+        if driver is not None:
+            self.driver = driver
+        else:
+            self.driver = True
         self.paused = True
         self.action = 0  # what action to do
         self.treads = [0,0]  # steering/throttle action
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
-        self.lr = 0.5 # learning rate
+        self.lr = 0.7 # learning rate
         self.downsample = 2
         self.imsz = np.asarray([240//2, 320//2])
         self.action_dict = {}
@@ -40,7 +43,7 @@ class RoverBrain(Rover):
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
         self.action_dict['q'] = [0, 0]
-        self.state_act = ['a', 'i', 'd', 'a', 'w', 'd', 'a', 'm', 'd']
+        self.state_act = [97, 105, 100, 97, 119, 100, 97, 109, 100]
         self.ps = 11
         self.k = 400
         self.k2 = 500
@@ -135,7 +138,7 @@ class RoverBrain(Rover):
         s[6] = torch.mean(l_l)
         s[7] = torch.mean(l_c)
         s[8] = torch.mean(l_r)
-
+        print(self.state_act[np.argmax(s)])
         return self.state_act[np.argmax(s)]
 
 
@@ -178,7 +181,7 @@ class RoverBrain(Rover):
                        self.whiten(a - torch.mean(a, 1)[:, None]))
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
-        a_2 = (2*self.lr) * a_2 ** 3
+        a_2 = (self.lr) * a_2 ** 3
         a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
         D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
@@ -196,13 +199,13 @@ class RoverBrain(Rover):
                                                  self.D,
                                                  self.D_2)
 
-            if self.driver:
-       	        key = self.getActiveKey()
-                self.action = chr(key)
-            else:
+            key = self.getActiveKey()
+
+            if key is None and self.driver is not False:
                 key = self.salience(self.a_2)
 
             if key:
+                self.action = chr(key)
                 if self.action in self.action_dict:
                     act = self.action_dict[self.action]
                     self.set_wheel_treads(act[0], act[1])
@@ -232,6 +235,7 @@ class RoverBrain(Rover):
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
+            key = None
 
             if self.action in self.cam_dict:
                 time.sleep(0.15)
