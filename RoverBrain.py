@@ -14,13 +14,14 @@ from skimage.util import view_as_windows as vaw
 from torchvision.transforms import Pad
 
 class RoverBrain(Rover):
-    def __init__(self):
+    def __init__(self, driver=True):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
         self.FPS = 8  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
+        self.driver = driver
         self.paused = True
         self.action = 0  # what action to do
         self.treads = [0,0]  # steering/throttle action
@@ -39,6 +40,7 @@ class RoverBrain(Rover):
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
         self.action_dict['q'] = [0, 0]
+        self.state_act = ['a', 'i', 'd', 'a', 'w', 'd', 'a', 'm', 'd']
         self.ps = 11
         self.k = 400
         self.k2 = 500
@@ -98,7 +100,7 @@ class RoverBrain(Rover):
         return np.uint8(M)
 
 
-    def salience(self, x, loud=False):
+    def salience(self, x):
         horiz = self.num_rows // 3
         vert = self.num_cols // 3
 
@@ -134,8 +136,7 @@ class RoverBrain(Rover):
         s[7] = torch.mean(l_c)
         s[8] = torch.mean(l_r)
 
-        if loud:
-            s = print(s_name[np.argmax(s)])
+        return self.state_act[np.argmax(s)]
 
 
 
@@ -186,56 +187,56 @@ class RoverBrain(Rover):
 
 #############################################################################
     def run(self):
-
         while type(self.image) == type(None):
             pass
 
         while not self.quit:
-       	    key = self.getActiveKey()
-
-            if key:
-                key = chr(key)
-
-                if key in self.action_dict:
-                    act = self.action_dict[key]
-                    self.set_wheel_treads(act[0], act[1])
-
-                elif key in self.cam_dict:
-                    act = self.cam_dict[key]
-                    self.move_camera_in_vertical_direction(act)
-
-                elif key == 'z':
-                    self.set_wheel_treads(0,0)
-                    self.quit = True
-
-
-
             self.image = imresize(self.image, self.imsz)
-
             self.D, self.D_2, self.a_2 = self.X3(self.image,
                                                  self.D,
                                                  self.D_2)
 
+            if self.driver:
+       	        key = self.getActiveKey()
+                self.action = chr(key)
+            else:
+                key = self.salience(self.a_2)
+
+            if key:
+                if self.action in self.action_dict:
+                    act = self.action_dict[self.action]
+                    self.set_wheel_treads(act[0], act[1])
+
+                elif self.action in self.cam_dict:
+                    act = self.cam_dict[self.action]
+                    self.move_camera_in_vertical_direction(act)
+
+                elif self.action == 'z':
+                    self.set_wheel_treads(0,0)
+                    self.quit = True
+
+
             if self.count % (self.FPS*2) == 0 or self.count == 0:
-                self.salience(self.a_2, loud=True)
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', #self.image)
                            self.montage(self.mat2ten(
                            self.D.cpu().numpy())))
             	cv2.waitKey(1)
-
             elif self.count % (self.FPS * 15) == 0:
                 rk = np.random.randint(0, self.D.size(1), 1)[0]
                 rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
                 self.D[:, rk] = torch.randn(self.D.size(0),)
                 self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
 
+
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
 
-            if key in ['i', 'm']:
+            if self.action in self.cam_dict:
+                time.sleep(0.15)
                 self.move_camera_in_vertical_direction(0)
+
 
         pygame.quit()
         cv2.destroyAllWindows()
