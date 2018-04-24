@@ -28,6 +28,7 @@ class RoverBrain(Rover):
         self.speed = .5  # change the vehicle's speed here
         self.ts = time.time()
         self.lr = 0.5 # learning rate
+        self.downsample = 2
         self.imsz = np.asarray([240//3, 320//3])
         self.action_dict = {}
         self.cam_dict = {}
@@ -38,7 +39,7 @@ class RoverBrain(Rover):
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
         self.action_dict['q'] = [0, 0]
-        self.ps = 15
+        self.ps = 11
         self.k = 196
         self.k2 = 256
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
@@ -112,6 +113,7 @@ class RoverBrain(Rover):
                   'lower center',
                   'lower right']
 
+        x = torch.abs(x)
         u_l = x.unfold(1, vert, vert*3)[:, :horiz, ...]
         u_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, :horiz, ...]
         u_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, :horiz, ...]
@@ -122,15 +124,15 @@ class RoverBrain(Rover):
         l_c = x[vert:vert*2, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
         l_r = x[vert*2:, :].unfold(1, vert, vert*3)[:, horiz*2:, ...]
 
-        s[0] = torch.sum(u_l)
-        s[1] = torch.sum(u_c)
-        s[2] = torch.sum(u_r)
-        s[3] = torch.sum(c_l)
-        s[4] = torch.sum(c_c)
-        s[5] = torch.sum(c_r)
-        s[6] = torch.sum(l_l)
-        s[7] = torch.sum(l_c)
-        s[8] = torch.sum(l_r)
+        s[0] = torch.mean(u_l)
+        s[1] = torch.mean(u_c)
+        s[2] = torch.mean(u_r)
+        s[3] = torch.mean(c_l)
+        s[4] = torch.mean(c_c)
+        s[5] = torch.mean(c_r)
+        s[6] = torch.mean(l_l)
+        s[7] = torch.mean(l_c)
+        s[8] = torch.mean(l_r)
 
         if loud:
             s = print(s_name[np.argmax(s)])
@@ -161,10 +163,10 @@ class RoverBrain(Rover):
         # cubic activation function
         a = (self.lr - self.count/1000) * a ** 3
 
-        x = x - torch.mm(D, a)
+        #x = x - torch.mm(D, a)
 
         # update dictionary based on Hebbian learning rule
-        D = D + torch.mm(x, torch.t(a))
+        D = D + torch.mm(x - torch.mm(D, a), torch.t(a))
 
         ############ second round --- abstract features #################
 
@@ -176,10 +178,10 @@ class RoverBrain(Rover):
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
         a_2 = (self.lr*2 - self.count/1000) * a_2 ** 3
-        a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
+        #a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
         D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a
+        return D, D_2, a_2
 
 
 #############################################################################
@@ -228,7 +230,6 @@ class RoverBrain(Rover):
                 self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
 
             self.salience(self.a_2)
-
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
