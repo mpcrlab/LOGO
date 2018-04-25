@@ -10,8 +10,7 @@ from scipy.misc import bytescale, imresize
 import torch
 import torch.nn.functional as f
 import sys, os
-from skimage.util import view_as_windows as vaw
-from torchvision.transforms import Pad
+
 
 class RoverBrain(Rover):
     def __init__(self, driver):
@@ -25,12 +24,10 @@ class RoverBrain(Rover):
             self.driver = driver
         else:
             self.driver = True
-        self.paused = True
+        #self.paused = True
         self.action = 0  # what action to do
-        self.treads = [0,0]  # steering/throttle action
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
-        self.ts = time.time()
         self.lr = 0.7 # learning rate
         self.downsample = 2
         self.imsz = np.asarray([240//2, 320//2])
@@ -40,9 +37,9 @@ class RoverBrain(Rover):
         self.action_dict['a'] = [-self.speed, self.speed]
         self.action_dict['s'] = [-self.speed, -self.speed]
         self.action_dict['d'] = [self.speed, -self.speed]
+        self.action_dict['q'] = [0, 0]
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
-        self.action_dict['q'] = [0, 0]
         self.state_act = [97, 105, 100, 97, 119, 100, 97, 109, 100]
         self.ps = 11
         self.k = 400
@@ -138,7 +135,7 @@ class RoverBrain(Rover):
         s[6] = torch.mean(l_l)
         s[7] = torch.mean(l_c)
         s[8] = torch.mean(l_r)
-        print(self.state_act[np.argmax(s)])
+
         return self.state_act[np.argmax(s)]
 
 
@@ -176,16 +173,14 @@ class RoverBrain(Rover):
 
         D_2 = torch.mm(D_2,
                        torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        #a = self.whiten(a - torch.mean(a, 1)[:, None])
-        a_2 = torch.mm(torch.t(D_2),
-                       self.whiten(a - torch.mean(a, 1)[:, None]))
+        a = self.whiten(a - torch.mean(a, 1)[:, None])
+        a_2 = torch.mm(torch.t(D_2), a)
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
         a_2 = (self.lr) * a_2 ** 3
-        a = torch.sqrt((a - torch.mm(D_2, a_2))**2)
         D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a
+        return D, D_2, a_2
 
 
 #############################################################################
@@ -200,12 +195,15 @@ class RoverBrain(Rover):
                                                  self.D_2)
 
             key = self.getActiveKey()
+            print(key)
+            print(self.driver)
 
-            if key is None and self.driver is not False:
+            if key is None and self.driver is False:
                 key = self.salience(self.a_2)
 
             if key:
                 self.action = chr(key)
+
                 if self.action in self.action_dict:
                     act = self.action_dict[self.action]
                     self.set_wheel_treads(act[0], act[1])
@@ -235,10 +233,10 @@ class RoverBrain(Rover):
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
-            key = None
+            #key = None
 
             if self.action in self.cam_dict:
-                time.sleep(0.15)
+                time.sleep(0.2)
                 self.move_camera_in_vertical_direction(0)
 
 
