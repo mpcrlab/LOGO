@@ -23,7 +23,7 @@ class RoverBrain(Rover):
         self.driver = driver
         self.action = 0  # what action to do
         self.count = 0
-        self.speed = .5  # change the vehicle's speed here
+        self.speed = .6  # change the vehicle's speed here
         self.const = 0.3
         self.lr = 2.
         self.downsample = 2
@@ -228,7 +228,7 @@ class RoverBrain(Rover):
             self.count += 1
 
             if self.action in self.cam_dict:
-                time.sleep(0.2)
+                time.sleep(0.12)
                 self.move_camera_in_vertical_direction(0)
 
 
