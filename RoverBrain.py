@@ -17,16 +17,17 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 3  # FRAMES PER SECOND
+        self.FPS = 10  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
         self.driver = driver
         self.action = 0  # what action to do
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
-        self.lr = 0.4 # learning rate
+        self.const = 0.3
+        self.lr = 2.
         self.downsample = 2
-        self.imsz = np.asarray([240//2, 320//2])
+        self.imsz = np.asarray([240//3, 320//3])
         self.action_dict = {}
         self.cam_dict = {}
         self.action_dict['w'] = [self.speed, self.speed]
@@ -37,9 +38,9 @@ class RoverBrain(Rover):
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
         self.state_act = [97, 105, 100, 97, 119, 100, 97, 109, 100]
-        self.ps = 25
-        self.k = 150
-        self.k2 = 200
+        self.ps = 15
+        self.k = 700
+        self.k2 = 700
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
@@ -64,11 +65,6 @@ class RoverBrain(Rover):
         ZCAMatrix = torch.mm(U, torch.mm(ZCAMatrix, torch.t(U)))
 
         return torch.mm(ZCAMatrix, X)
-
-
-    def get_action(x):
-        key = self.getActiveKey()
-        key2 = self.salience(x)
 
 
     def mat2ten(self, X, c=3):
@@ -135,7 +131,6 @@ class RoverBrain(Rover):
         s[6] = torch.mean(l_l)
         s[7] = torch.mean(l_c)
         s[8] = torch.mean(l_r)
-        print(s_name[np.argmax(s)])
         return self.state_act[np.argmax(s)]
 
 
@@ -149,8 +144,8 @@ class RoverBrain(Rover):
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
                                 x.size(3)*x.size(4), x.size(-1))
         x = x - torch.mean(x, 0)
-        x = torch.t(x.view(-1, x.size(1)*3))
-        x = self.whiten(x)
+        x = self.whiten(torch.t(x.view(-1, x.size(1)*3)))
+        #x = self.whiten(x)
 
         # scale each patch between 0 and 1
         D = torch.mm(D, torch.diag(1./(torch.sqrt(torch.sum(D**2, 0))+e)))
@@ -162,12 +157,12 @@ class RoverBrain(Rover):
         a = torch.mm(a, torch.diag(1./(torch.sqrt(torch.sum(a**2, 0))+e)))
 
         # cubic activation function
-        a = self.lr * a ** 3
+        a = self.const * a ** 3
 
         #x = x - torch.mm(D, a)
 
         # update dictionary based on Hebbian learning rule
-        D = D + torch.mm(x - torch.mm(D, a), torch.t(a))
+        D = D + self.lr * torch.mm(x - torch.mm(D, a), torch.t(a))
 
         ############ second round --- abstract features #################
 
@@ -177,10 +172,10 @@ class RoverBrain(Rover):
         a_2 = torch.mm(torch.t(D_2), a)
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
-        a_2 = (self.lr) * a_2 ** 3
-        D_2 = D_2 + torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
+        a_2 = self.const * a_2 ** 3
+        D_2 = D_2 + self.lr * torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a_2
+        return D, D_2, a - torch.mm(D_2, a_2)
 
 
 #############################################################################
@@ -215,7 +210,7 @@ class RoverBrain(Rover):
                     self.quit = True
 
 
-            if self.count % (self.FPS) == 0 or self.count == 0:
+            if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', #self.image)
                            self.montage(self.mat2ten(
@@ -233,7 +228,7 @@ class RoverBrain(Rover):
             self.count += 1
 
             if self.action in self.cam_dict:
-                time.sleep(0.15)
+                time.sleep(0.2)
                 self.move_camera_in_vertical_direction(0)
 
 
