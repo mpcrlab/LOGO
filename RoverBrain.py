@@ -17,7 +17,7 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 10  # FRAMES PER SECOND
+        self.FPS = 15  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
         self.driver = driver
@@ -175,7 +175,7 @@ class RoverBrain(Rover):
         a_2 = self.const * a_2 ** 3
         D_2 = D_2 + self.lr * torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a - torch.mm(D_2, a_2)
+        return D, D_2, a_2
 
 
 #############################################################################
