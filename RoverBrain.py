@@ -66,6 +66,10 @@ class RoverBrain(Rover):
         return torch.mm(ZCAMatrix, X)
 
 
+    def get_action(x):
+        key = self.getActiveKey()
+        key2 = self.salience(x)
+
 
     def mat2ten(self, X, c=3):
         zs=[X.shape[1], int(np.sqrt(X.shape[0]//c)), int(np.sqrt(X.shape[0]//c)), c]
@@ -189,10 +193,11 @@ class RoverBrain(Rover):
             self.D, self.D_2, self.a_2 = self.X3(self.image,
                                                  self.D,
                                                  self.D_2)
-            if not self.driver:
-                key = self.salience(self.a_2)
 
+            # get the key the user pressed if they pressed one
             key = self.getActiveKey()
+            if not key and self.driver == 'robot':
+                key = self.salience(self.a_2)
 
             if key:
                 self.action = chr(key)
