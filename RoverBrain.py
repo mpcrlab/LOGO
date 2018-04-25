@@ -20,11 +20,7 @@ class RoverBrain(Rover):
         self.FPS = 8  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
-        if driver is not None:
-            self.driver = driver
-        else:
-            self.driver = True
-        #self.paused = True
+        self.driver = driver
         self.action = 0  # what action to do
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
@@ -193,13 +189,10 @@ class RoverBrain(Rover):
             self.D, self.D_2, self.a_2 = self.X3(self.image,
                                                  self.D,
                                                  self.D_2)
+            if not self.driver:
+                key = self.salience(self.a_2)
 
             key = self.getActiveKey()
-            print(key)
-            print(self.driver)
-
-            if key is None and self.driver is False:
-                key = self.salience(self.a_2)
 
             if key:
                 self.action = chr(key)
@@ -233,10 +226,9 @@ class RoverBrain(Rover):
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
-            #key = None
 
             if self.action in self.cam_dict:
-                time.sleep(0.2)
+                time.sleep(0.15)
                 self.move_camera_in_vertical_direction(0)
 
 
