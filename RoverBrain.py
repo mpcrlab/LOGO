@@ -17,14 +17,14 @@ class RoverBrain(Rover):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
-        self.FPS = 8  # FRAMES PER SECOND
+        self.FPS = 3  # FRAMES PER SECOND
         self.image = None  # incoming image
         self.quit = False
         self.driver = driver
         self.action = 0  # what action to do
         self.count = 0
         self.speed = .5  # change the vehicle's speed here
-        self.lr = 0.7 # learning rate
+        self.lr = 0.4 # learning rate
         self.downsample = 2
         self.imsz = np.asarray([240//2, 320//2])
         self.action_dict = {}
@@ -37,9 +37,9 @@ class RoverBrain(Rover):
         self.cam_dict['i'] = 1
         self.cam_dict['m'] = -1
         self.state_act = [97, 105, 100, 97, 119, 100, 97, 109, 100]
-        self.ps = 11
-        self.k = 400
-        self.k2 = 500
+        self.ps = 25
+        self.k = 150
+        self.k2 = 200
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
@@ -135,7 +135,7 @@ class RoverBrain(Rover):
         s[6] = torch.mean(l_l)
         s[7] = torch.mean(l_c)
         s[8] = torch.mean(l_r)
-
+        print(s_name[np.argmax(s)])
         return self.state_act[np.argmax(s)]
 
 
@@ -196,7 +196,7 @@ class RoverBrain(Rover):
 
             # get the key the user pressed if they pressed one
             key = self.getActiveKey()
-            if not key and self.driver == 'robot':
+            if not key and self.driver in ['AI', 'ai', 'ml']:
                 key = self.salience(self.a_2)
 
             if key:
@@ -215,7 +215,7 @@ class RoverBrain(Rover):
                     self.quit = True
 
 
-            if self.count % (self.FPS*2) == 0 or self.count == 0:
+            if self.count % (self.FPS) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', #self.image)
                            self.montage(self.mat2ten(
