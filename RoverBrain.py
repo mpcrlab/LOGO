@@ -239,8 +239,8 @@ class RoverBrain(Rover):
             	cv2.waitKey(1)
 
             # pruning features that fire similarly for every input
-            elif self.count % (self.FPS * 10) == 0:
-                #print('pruning features')
+            elif self.count % (self.FPS * 7) == 0 and self.count > self.FPS * 7:
+                print('pruning features')
                 self.prune()
 
 
@@ -249,7 +249,7 @@ class RoverBrain(Rover):
             self.count += 1
 
             if self.action in self.cam_dict:
-                time.sleep(0.12)
+                time.sleep(0.2)
                 self.move_camera_in_vertical_direction(0)
 
 
