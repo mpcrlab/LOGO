@@ -27,7 +27,7 @@ class RoverBrain(Rover):
         self.const = 0.3
         self.lr = 2.
         self.downsample = 2
-        self.imsz = np.asarray([240//3, 320//3])
+        self.imsz = np.asarray([240//2, 320//2])
         self.action_dict = {}
         self.cam_dict = {}
         self.action_dict['w'] = [self.speed, self.speed]
@@ -39,12 +39,13 @@ class RoverBrain(Rover):
         self.cam_dict['m'] = -1
         self.state_act = [97, 105, 100, 97, 119, 100, 97, 109, 100]
         self.ps = 15
-        self.k = 700
+        self.k = 675
         self.k2 = 700
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
-        self.num_rows, self.num_cols = self.imsz - self.ps
-        self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
         self.D_2 = torch.randn(self.k, self.k2).float().cuda(0)
+        self.num_rows, self.num_cols = self.imsz - self.ps
+        self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
+        self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
         self.run()
 
 
@@ -94,6 +95,15 @@ class RoverBrain(Rover):
                 image_id += 1
 
         return np.uint8(M)
+
+
+    def prune(self):
+        prange = torch.max(self.a, 1)[0] - torch.min(self.a, 1)[0]
+        prange2 = torch.max(self.a_2, 1)[0] - torch.min(self.a_2, 1)[0]
+        prange = np.argmin(prange.cpu().numpy())
+        prange2 = np.argmin(prange2.cpu().numpy())
+        self.D[:, prange] = torch.randn(self.D.size(0),)
+        self.D_2[:, prange2] = torch.randn(self.D_2.size(0),)
 
 
     def salience(self, x):
@@ -175,7 +185,7 @@ class RoverBrain(Rover):
         a_2 = self.const * a_2 ** 3
         D_2 = D_2 + self.lr * torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a_2
+        return D, D_2, a, a_2
 
 
 #############################################################################
@@ -185,9 +195,9 @@ class RoverBrain(Rover):
 
         while not self.quit:
             self.image = imresize(self.image, self.imsz)
-            self.D, self.D_2, self.a_2 = self.X3(self.image,
-                                                 self.D,
-                                                 self.D_2)
+            self.D, self.D_2, self.a, self.a_2 = self.X3(self.image,
+                                                         self.D,
+                                                         self.D_2)
 
             # get the key the user pressed if they pressed one
             key = self.getActiveKey()
@@ -210,17 +220,18 @@ class RoverBrain(Rover):
                     self.quit = True
 
 
+            # slow down dictionary visualization to every two seconds
+            # because it freezes if it is shown every frame
             if self.count % (self.FPS*2) == 0 or self.count == 0:
             	cv2.namedWindow('dictionary', cv2.WINDOW_NORMAL)
             	cv2.imshow('dictionary', #self.image)
                            self.montage(self.mat2ten(
                            self.D.cpu().numpy())))
             	cv2.waitKey(1)
-            elif self.count % (self.FPS * 15) == 0:
-                rk = np.random.randint(0, self.D.size(1), 1)[0]
-                rk_2 = np.random.randint(0, self.D_2.size(1), 1)[0]
-                self.D[:, rk] = torch.randn(self.D.size(0),)
-                self.D_2[:, rk_2] = torch.randn(self.D_2.size(0),)
+
+            # pruning features that fire similarly for every input
+            elif self.count % (self.FPS * 10) == 0:
+                self.prune()
 
 
             self.clock.tick(self.FPS)
