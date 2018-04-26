@@ -189,12 +189,12 @@ class RoverBrain(Rover):
 
         D_2 = torch.mm(D_2,
                        torch.diag(1./(torch.sqrt(torch.sum(D_2**2, 0))+e)))
-        a = self.whiten(a - torch.mean(a, 1)[:, None])
-        a_2 = torch.mm(torch.t(D_2), a)
+        x2 = self.whiten(a - torch.mean(a, 1)[:, None])
+        a_2 = torch.mm(torch.t(D_2), x2)
         a_2 = torch.mm(a_2,
                        torch.diag(1./(torch.sqrt(torch.sum(a_2**2, 0))+e)))
         a_2 = self.const * a_2 ** 3
-        D_2 = D_2 + self.lr * torch.mm(a - torch.mm(D_2, a_2), torch.t(a_2))
+        D_2 = D_2 + self.lr * torch.mm(x2 - torch.mm(D_2, a_2), torch.t(a_2))
 
         return D, D_2, a, a_2
 
