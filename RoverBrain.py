@@ -10,10 +10,11 @@ from scipy.misc import bytescale, imresize
 import torch
 import torch.nn.functional as f
 import sys, os
+import h5py
 
 
 class RoverBrain(Rover):
-    def __init__(self, driver):
+    def __init__(self, driver, save):
         Rover.__init__(self)
         self.userInterface = Pygame_UI()
         self.clock = pygame.time.Clock()
@@ -46,6 +47,7 @@ class RoverBrain(Rover):
         self.num_rows, self.num_cols = self.imsz - self.ps
         self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
         self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
+        self.save_dict = save
         self.run()
 
 
@@ -252,6 +254,12 @@ class RoverBrain(Rover):
                 time.sleep(0.2)
                 self.move_camera_in_vertical_direction(0)
 
+
+        if self.save_dict:
+            f = h5py.File('rover_dicts.h5', 'a')
+            f.create_dataset('D', data=self.D)
+            f.create_dataset('D2', data=self.D_2)
+            f.close()
 
         pygame.quit()
         cv2.destroyAllWindows()
