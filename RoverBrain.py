@@ -98,12 +98,21 @@ class RoverBrain(Rover):
 
 
     def prune(self):
-        prange = torch.max(self.a, 1)[0] - torch.min(self.a, 1)[0]
-        prange2 = torch.max(self.a_2, 1)[0] - torch.min(self.a_2, 1)[0]
-        prange = np.argmin(prange.cpu().numpy())
-        prange2 = np.argmin(prange2.cpu().numpy())
-        self.D[:, prange] = torch.randn(self.D.size(0),)
-        self.D_2[:, prange2] = torch.randn(self.D_2.size(0),)
+        dsz = int(self.k * 0.01)
+        d2sz = int(self.k2 * 0.01)
+        a_abs = torch.abs(self.a)
+        a2_abs = torch.abs(self.a_2)
+        prange = torch.max(a_abs, 1)[0] - torch.min(a_abs, 1)[0]
+        prange2 = torch.max(a2_abs, 1)[0] - torch.min(a2_abs, 1)[0]
+        prange = np.argpartition(prange.cpu().numpy(), dsz)[:dsz]
+        prange2 = np.argpartition(prange2.cpu().numpy(), d2sz)[:d2sz]
+        for indx in prange:
+            self.D[:, indx] = torch.randn(self.D.size(0),)
+        for indx2 in prange2:
+            self.D_2[:, indx2] = torch.randn(self.D_2.size(0),)
+        #self.D[:, prange[:dsz]] = torch.randn(self.D.size(0),)
+        #self.D_2[:, prange2[:d2sz]] = torch.randn(self.D_2.size(0),)
+
 
 
     def salience(self, x):
@@ -231,6 +240,7 @@ class RoverBrain(Rover):
 
             # pruning features that fire similarly for every input
             elif self.count % (self.FPS * 10) == 0:
+                #print('pruning features')
                 self.prune()
 
 
