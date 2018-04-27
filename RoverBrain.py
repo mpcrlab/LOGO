@@ -255,7 +255,7 @@ class RoverBrain(Rover):
                 self.move_camera_in_vertical_direction(0)
 
 
-        if self.save_dict:
+        if self.save_dict is True:
             f = h5py.File('rover_dicts.h5', 'a')
             f.create_dataset('D', data=self.D)
             f.create_dataset('D2', data=self.D_2)
