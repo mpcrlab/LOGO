@@ -26,7 +26,7 @@ class RoverBrain(Rover):
         self.count = 0
         self.speed = .6  # change the vehicle's speed here
         self.const = 0.3
-        self.lr = 2.
+        self.lr = 2.5
         self.downsample = 2
         self.imsz = np.asarray([240//2, 320//2])
         self.action_dict = {}
@@ -249,13 +249,14 @@ class RoverBrain(Rover):
             self.clock.tick(self.FPS)
             pygame.display.flip()
             self.count += 1
+            self.lr -= 0.001
 
             if self.action in self.cam_dict:
                 time.sleep(0.2)
                 self.move_camera_in_vertical_direction(0)
 
 
-        if self.save_dict is True:
+        if self.save_dict in ['save', 'yes', 'y']:
             f = h5py.File('rover_dicts.h5', 'a')
             f.create_dataset('D', data=self.D)
             f.create_dataset('D2', data=self.D_2)
