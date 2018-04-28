@@ -44,7 +44,7 @@ class RoverBrain(Rover):
         self.k2 = 700
         self.D = torch.randn(3*self.ps**2, self.k).float().cuda(0)
         self.D_2 = torch.randn(self.k, self.k2).float().cuda(0)
-        self.num_rows, self.num_cols = self.imsz - self.ps
+        self.num_rows, self.num_cols = self.imsz
         self.a = torch.zeros(self.k, self.num_rows*self.num_cols).cuda(0)
         self.a_2 = torch.zeros(self.k2, self.num_rows*self.num_cols).cuda(0)
         self.save_dict = save
@@ -62,12 +62,12 @@ class RoverBrain(Rover):
 
     def whiten(self, X):
         '''Function to ZCA whiten image matrix.'''
-        
+
         try:
             U,S,V = torch.svd(torch.mm(X, torch.t(X)))
         except RuntimeError:
             return X
-        
+
         epsilon = 1e-5
         ZCAMatrix = torch.diag(1.0/torch.sqrt(S + epsilon))
         ZCAMatrix = torch.mm(U, torch.mm(ZCAMatrix, torch.t(U)))
@@ -165,8 +165,11 @@ class RoverBrain(Rover):
         e = 1e-8  # constant to avoid div. by 0.
 
         # prepare x, normalize, whiten, etc.
-        x = (torch.from_numpy(x).float().cuda(0)).unfold(0,
-             self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
+        x = np.pad(x, ((self.ps//2, self.ps//2),
+                       (self.ps//2, self.ps//2),
+                       (0, 0)), 'reflect')
+        x = torch.from_numpy(x).float().cuda(0)
+        x = x.unfold(0, self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
                                 x.size(3)*x.size(4), x.size(-1))
         x = x - torch.mean(x, 0)
@@ -201,7 +204,7 @@ class RoverBrain(Rover):
         a_2 = self.const * a_2 ** 3
         D_2 = D_2 + self.lr * torch.mm(x2 - torch.mm(D_2, a_2), torch.t(a_2))
 
-        return D, D_2, a, a_2
+        return D, D_2, a, x2 - torch.mm(D_2, a_2)
 
 
 #############################################################################
@@ -257,7 +260,7 @@ class RoverBrain(Rover):
             self.lr -= 0.001
 
             if self.action in self.cam_dict:
-                time.sleep(0.2)
+                time.sleep(0.1)
                 self.move_camera_in_vertical_direction(0)
 
 
