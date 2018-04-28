@@ -62,7 +62,12 @@ class RoverBrain(Rover):
 
     def whiten(self, X):
         '''Function to ZCA whiten image matrix.'''
-        U,S,V = torch.svd(torch.mm(X, torch.t(X)))
+        
+        try:
+            U,S,V = torch.svd(torch.mm(X, torch.t(X)))
+        except RuntimeError:
+            return X
+        
         epsilon = 1e-5
         ZCAMatrix = torch.diag(1.0/torch.sqrt(S + epsilon))
         ZCAMatrix = torch.mm(U, torch.mm(ZCAMatrix, torch.t(U)))
