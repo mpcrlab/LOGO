@@ -264,12 +264,12 @@ class RoverBrain(Rover):
                 self.move_camera_in_vertical_direction(0)
 
 
+        pygame.quit()
+        cv2.destroyAllWindows()
         if self.save_dict in ['save', 'yes', 'y']:
-            f = h5py.File('rover_dicts.h5', 'a')
+            f = h5py.File('/home/LOGO/data/rover_dicts.h5', 'a')
             f.create_dataset('D', data=self.D)
             f.create_dataset('D2', data=self.D_2)
             f.close()
 
-        pygame.quit()
-        cv2.destroyAllWindows()
         self.close()
