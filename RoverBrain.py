@@ -167,7 +167,7 @@ class RoverBrain(Rover):
         # prepare x, normalize, whiten, etc.
         x = np.pad(x, ((self.ps//2, self.ps//2),
                        (self.ps//2, self.ps//2),
-                       (0, 0)), 'reflect')
+                       (0, 0)), 'constant')
         x = torch.from_numpy(x).float().cuda(0)
         x = x.unfold(0, self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
