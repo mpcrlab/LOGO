@@ -13,12 +13,13 @@ from torch.utils import data
 from torch.autograd import Variable
 import torch.optim as optim
 
-D = h5py.File('rover_dicts.h5', 'r')
+D = h5py.File('/home/LOGO/data/rover_dicts.h5', 'r')
 D_2 = torch.from_numpy(np.asarray(D['D2'])).cuda(0)
 D = torch.from_numpy(np.asarray(D['D'])).cuda(0)
 
 os.chdir('/home/LOGO/data')
-files = glob.glob('*.h5')
+files = glob.glob('*Sheri.h5')
+print(files)
 
 ps = 15
 batch_sz = 250
@@ -112,7 +113,7 @@ def get_code(x):
         #cv2.waitKey(500)
         #cv2.imshow('image', imresize(x, imsz))
         #cv2.waitKey(500)
-    return torch.mean(X, 1)
+    return torch.max(X, 1)[0]
 
 
 def get_batch(indx, batch_n):
@@ -126,6 +127,7 @@ def get_batch(indx, batch_n):
 
     for i in range(X.shape[0]):
         vecs[i, :] = get_code(X[i, ...])
+    vecs = vecs - torch.mean(vecs, 1)[:, None]
 
     return Variable(vecs).float(), Variable(Y).long()
 
@@ -135,37 +137,40 @@ def loss_acc(pred, label):
     pr = pred.data.cpu().numpy()
     la = label.data.cpu().numpy()
     a = np.mean(np.int32(np.equal(np.argmax(pr, 1), la)))
-    return l, a
+    pr = np.argmax(pr, 1)
+    conf = np.zeros([4, 4, 3])
+    for i in xrange(4):
+        for j in xrange(4):
+            conf[i, j, :] = np.sum(np.logical_and((la == i), (pr == j)))
+
+    return l, a, conf
 
 
 class NN(nn.Module):
     def __init__(self):
         super(NN, self).__init__()
         self.fc1 = nn.DataParallel(nn.Linear(k2, 500).cuda())
-        self.do1 = nn.Dropout()
+        self.do1 = nn.Dropout(p=0.4)
         self.fc2 = nn.DataParallel(nn.Linear(500, 500).cuda())
-        self.do2 = nn.Dropout()
+        self.do2 = nn.Dropout(p=0.4)
         self.fc3 = nn.DataParallel(nn.Linear(500, 500).cuda())
-        self.do3 = nn.Dropout()
-        self.fc4 = nn.DataParallel(nn.Linear(500, 500).cuda())
-        self.do4 = nn.Dropout()
-        self.fc5 = nn.DataParallel(nn.Linear(500, 500).cuda())
-        self.do5 = nn.Dropout()
+        self.do3 = nn.Dropout(p=0.4)
         self.fc6 = nn.DataParallel(nn.Linear(500, 4).cuda())
 
     def forward(self, x):
         x = self.do1(f.tanh(self.fc1(x)))
         x = self.do2(f.tanh(self.fc2(x)))
         x = self.do3(f.tanh(self.fc3(x)))
-        x = self.do4(f.tanh(self.fc4(x)))
-        x = self.do5(f.tanh(self.fc5(x)))
+        #x = self.do4(f.tanh(self.fc4(x)))
+        #x = self.do5(f.tanh(self.fc5(x)))
         x = self.fc6(x)
-        return x
+        return f.softmax(x, dim=1)
 
 
 
 writer = SummaryWriter('runs/train')
 writer2 = SummaryWriter('runs/test')
+writer3 = SummaryWriter('runs/confusion')
 
 Network = NN()
 loss_func = nn.CrossEntropyLoss().cuda()
@@ -173,16 +178,21 @@ opt = optim.Adam(Network.parameters(), lr=1e-4)
 
 for iters in range(1000):
     X, Y = get_batch(np.random.randint(0, len(files)-2, 1)[0], batch_sz)
-    loss, acc = loss_acc(Network(X), Y)
+    loss, acc, tcm = loss_acc(Network(X), Y)
     opt.zero_grad()
     loss.backward()
     opt.step()
 
     if iters % 20 == 0:
-        VX, VY = get_batch(-1, 800)
-        vl, va = loss_acc(Network(VX), VY)
+        VX, VY = get_batch(-1, 700)
+        VX = Network(VX)
+        vl, va, vcm = loss_acc(VX, VY)
         writer.add_scalar('Val. Acc.', va, iters)
         writer2.add_scalar('Val. Loss', vl.data[0], iters)
+        writer3.add_image('Val Confusion Matrix', vcm, iters)
+        print(vcm)
+
 
     writer.add_scalar('Train Acc.', acc, iters)
     writer2.add_scalar('Train Loss', loss.data[0], iters)
+    writer3.add_image('Train Confusion Matrix', tcm, iters)
