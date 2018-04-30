@@ -245,7 +245,7 @@ class RoverBrain(Rover):
             	cv2.waitKey(1)
 
             # pruning features that fire similarly for every input
-            if self.count % (self.FPS * 4) == 0 and self.count > self.FPS * 5:
+            if self.count % (self.FPS * 5) == 0 and self.count > self.FPS * 5:
                 print('pruning features')
                 self.prune()
 
