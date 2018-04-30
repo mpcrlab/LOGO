@@ -105,21 +105,17 @@ class RoverBrain(Rover):
 
 
     def prune(self):
-        dsz = int(self.k * 0.01)
-        d2sz = int(self.k2 * 0.01)
-        a_abs = torch.abs(self.a)
-        a2_abs = torch.abs(self.a_2)
-        prange = torch.max(a_abs, 1)[0] - torch.min(a_abs, 1)[0]
-        prange2 = torch.max(a2_abs, 1)[0] - torch.min(a2_abs, 1)[0]
-        prange = np.argpartition(prange.cpu().numpy(), dsz)[:dsz]
-        prange2 = np.argpartition(prange2.cpu().numpy(), d2sz)[:d2sz]
-        for indx in prange:
-            self.D[:, indx] = torch.randn(self.D.size(0),)
-        for indx2 in prange2:
-            self.D_2[:, indx2] = torch.randn(self.D_2.size(0),)
-        #self.D[:, prange[:dsz]] = torch.randn(self.D.size(0),)
-        #self.D_2[:, prange2[:d2sz]] = torch.randn(self.D_2.size(0),)
+        dsz = int(self.k * 0.03)
+        d2sz = int(self.k2 * 0.03)
+        n1 = torch.sum(torch.abs(self.a) < 0.08, 1)
+        n2 = torch.sum(torch.abs(self.a_2) < 0.08, 1)
+        n1 = np.sort(n1.cpu().numpy())[:dsz]
+        n2 = np.sort(n2.cpu().numpy())[:d2sz]
 
+        for indx in range(n2.size):
+            if indx < n1.size - 1:
+                self.D[:, n1[indx]] = torch.randn(self.D.size(0),)
+            self.D_2[:, n2[indx]] = torch.randn(self.D_2.size(0),)
 
 
     def salience(self, x):
@@ -167,7 +163,7 @@ class RoverBrain(Rover):
         # prepare x, normalize, whiten, etc.
         x = np.pad(x, ((self.ps//2, self.ps//2),
                        (self.ps//2, self.ps//2),
-                       (0, 0)), 'constant')
+                       (0, 0)), 'reflect')
         x = torch.from_numpy(x).float().cuda(0)
         x = x.unfold(0, self.ps, 1).unfold(1, self.ps, 1).unfold(2, 3, 1)
         x = x.contiguous().view(x.size(0)*x.size(1)*x.size(2),
@@ -249,7 +245,7 @@ class RoverBrain(Rover):
             	cv2.waitKey(1)
 
             # pruning features that fire similarly for every input
-            elif self.count % (self.FPS * 8) == 0 and self.count > self.FPS * 10:
+            if self.count % (self.FPS * 4) == 0 and self.count > self.FPS * 5:
                 print('pruning features')
                 self.prune()
 
@@ -266,8 +262,8 @@ class RoverBrain(Rover):
 
         pygame.quit()
         cv2.destroyAllWindows()
-        if self.save_dict in ['save', 'yes', 'y']:
-            f = h5py.File('/home/LOGO/data/rover_dicts.h5', 'a')
+        if self.save_dict is not None:
+            f = h5py.File('/home/LOGO/data/' + self.save_dict + '.h5', 'a')
             f.create_dataset('D', data=self.D)
             f.create_dataset('D2', data=self.D_2)
             f.close()
