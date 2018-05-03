@@ -107,8 +107,8 @@ class RoverBrain(Rover):
     def prune(self):
         dsz = int(self.k * 0.03)
         d2sz = int(self.k2 * 0.03)
-        n1 = torch.sum(torch.abs(self.a) < 0.08, 1)
-        n2 = torch.sum(torch.abs(self.a_2) < 0.08, 1)
+        n1 = torch.sum(torch.abs(self.a) < 0.01, 1)
+        n2 = torch.sum(torch.abs(self.a_2) < 0.01, 1)
         n1 = n1.cpu().numpy()
         n2 = n2.cpu().numpy()
 
@@ -249,7 +249,7 @@ class RoverBrain(Rover):
             	cv2.waitKey(1)
 
             # pruning features that fire similarly for every input
-            if self.count % (self.FPS * 5) == 0 and self.count > self.FPS * 5:
+            if self.count % (self.FPS * 10) == 0 and self.count > self.FPS * 5:
                 print('pruning features')
                 self.prune()
 
