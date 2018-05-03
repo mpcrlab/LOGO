@@ -109,13 +109,17 @@ class RoverBrain(Rover):
         d2sz = int(self.k2 * 0.03)
         n1 = torch.sum(torch.abs(self.a) < 0.08, 1)
         n2 = torch.sum(torch.abs(self.a_2) < 0.08, 1)
-        n1 = np.sort(n1.cpu().numpy())[:dsz]
-        n2 = np.sort(n2.cpu().numpy())[:d2sz]
+        n1 = n1.cpu().numpy()
+        n2 = n2.cpu().numpy()
 
-        for indx in range(n2.size):
-            if indx < n1.size - 1:
-                self.D[:, n1[indx]] = torch.randn(self.D.size(0),)
-            self.D_2[:, n2[indx]] = torch.randn(self.D_2.size(0),)
+        for indx in range(d2sz):
+            if indx < dsz - 1:
+                rem_feat = np.argmin(n1)
+                self.D[:, rem_feat] = torch.randn(self.D.size(0),)
+                n1[rem_feat] = np.amax(n1)
+            rem_feat2 = np.argmin(n2)
+            self.D_2[:, rem_feat2] = torch.randn(self.D_2.size(0),)
+            n2[rem_feat2] = np.amax(n2)
 
 
     def salience(self, x):
