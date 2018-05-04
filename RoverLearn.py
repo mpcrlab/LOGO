@@ -66,8 +66,11 @@ h5file = h5py.File(files[0], 'r')
 X = np.asarray(h5file['X'])[200, ...]
 
 def get_code(x):
-    X = torch.from_numpy(imresize(x, imsz)).float().cuda(0)
-    X = f.pad(X, (0, 0, ps//2, ps//2, ps//2, ps//2)).data
+    X = imresize(x, imsz)
+    X = np.pad(X, ((ps//2, ps//2),
+                   (ps//2, ps//2),
+                   (0, 0)), 'reflect')
+    X = torch.from_numpy(X).float().cuda(0)
     X = X.unfold(0, ps, 1).unfold(1, ps, 1).unfold(2, 3, 1)
     X = X.contiguous().view(X.size(0)*X.size(1)*X.size(2),
                         X.size(3)*X.size(4), X.size(-1))
@@ -83,7 +86,12 @@ def get_code(x):
     #vec[:num_rows*num_cols] = torch.mm(phi, X2)
     #vec[num_rows*num_cols:] = torch.mm(phi2, X)
     #kk = 0
-
+    fig = plt.figure()
+    a1 = fig.add_subplot(121)
+    a2 = fig.add_subplot(122)
+    a1.imshow(X[0, :].contiguous().view(num_rows, num_cols), cmap='gray')
+    a2.imshow(x)
+    plt.show()
 
     # for n in xrange(k):
     #     im = torch.zeros([num_rows//dst, num_cols//dst]).cuda(0)
