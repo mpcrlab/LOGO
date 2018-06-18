@@ -1,4 +1,4 @@
-from RoverBrain import *
+from RoverBrain2 import *
 import argparse
 
 parser = argparse.ArgumentParser(description='Rover Curiosity Parameters')
@@ -9,4 +9,4 @@ print(args.driver)
 print(args.save_dict)
 
 if __name__ == '__main__':
-    rover = RoverBrain(args.driver, args.save_dict)
+    rover = RoverBrain2(args.driver, args.save_dict)
